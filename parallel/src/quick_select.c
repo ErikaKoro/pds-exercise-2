@@ -3,16 +3,16 @@
 #include <stdlib.h>
 
 // Utility function to swapping of element
-void swap(int* a, int* b){
-    int temp = *a;
+void swap(double* a, double* b){
+    double temp = *a;
     *a = *b;
     *b = temp;
 }
 
 // find the right position of pivot
 //retutn its index
-int partition(int arr[], int left, int right){
-    int pivot = arr[right];
+int partition(double arr[], int left, int right){
+    double pivot = arr[right];
 
     int i = left;
     int j = left;
@@ -25,16 +25,6 @@ int partition(int arr[], int left, int right){
         j++;
     }
 
-
-
-    // for(int j = left; j < right; j++){
-    //     // if current element is smaller than the pivot
-    //     if(arr[j] < pivot){
-    //         swap(&arr[i], &arr[j]);
-    //         i++;
-    //     }
-    // }
-
     swap(&arr[i], &arr[right]);
 
     return i;
@@ -46,8 +36,8 @@ int partition(int arr[], int left, int right){
 //l and r and partitions arr[l..r]
 //around the randomly picked element
 //using partition()
-int randomPartition(int arr[], int left, int right){
-    // srand(time(NULL));
+int randomPartition(double arr[], int left, int right){
+    srand(time(NULL));
     int length = right - left + 1;
     int pivot = rand() % length;
 
@@ -57,7 +47,7 @@ int randomPartition(int arr[], int left, int right){
 }
 
 //utility function to find median
-void MedianUtil(int arr[], int left, int right, int middle, int *a, int *b){
+void MedianUtil(double arr[], int left, int right, int middle, double *a, double *b){
 
     if (left <= right) {
 
@@ -95,21 +85,20 @@ void MedianUtil(int arr[], int left, int right, int middle, int *a, int *b){
 }
 
 // Function to find Median
-void findMedian(int arr[], int length){
+double findMedian(double *arr, int length){
     double result;
 
-    int a = -1, b = -1;
+    double a = -1, b = -1;
 
     // If n is odd
     if (length % 2 == 1) {
         MedianUtil(arr, 0, length - 1, length / 2, &a, &b);
         result = b;
     }
-
-        // If n is even
+    // If n is even
     else {
         MedianUtil(arr, 0, length - 1, length / 2, &a, &b);
-        result = (double)(a + b) / 2;
+        result = (a + b) / 2;
     }
 
     // // our length is even(from our data)
@@ -119,19 +108,7 @@ void findMedian(int arr[], int length){
     // Print the Median of arr[]
     printf("The median is: %f\n", result);
 
-}
+    return result;
 
-// Driver program to test above methods
-int main() {
-
-    int arr[] = {3, 7, 9, 12, 19, 4, 5, 6};
-
-
-    int n = 8;
-    //int par = partition(arr, 0, 6);
-    //int ran = randomPartition(arr, 0, 6);
-    // printf("The index of partition is: %d\n", ran);
-    findMedian(arr, n);
-    return 0;
 }
 
