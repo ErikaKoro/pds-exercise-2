@@ -26,7 +26,7 @@
     <li><a href="#useful-links">Useful links</a></li>
   </ol>
 </details>
-## About this project
+##About this project
 <p align="justify">
 The objective of this project is to distribute an amount of given points (given their coordinates) by their median to a number of processes using Message Passing Interface (MPI) in C programming language.At first, we were given a number of points (consider this as "N") distributed in some processes (consider number of processes as "P") where every process holds locally N/P points. You may consider the dimensions of the points as "d".The distribution took place using the following algorithm:
 <br/>
@@ -35,6 +35,7 @@ At first, we chose a process to be the _**master**_ process which, sort of, cont
 <br/>
 After the distribution is done:
 <br/>
-Note 1: All the processes must locally hold exactly N/P points. 
+Note 1: All the processes must locally hold exactly N/P points.
+<br/> 
 Note 2: The smaller the rank of a process the smaller the distance(s) of the points that it holds after the distribution.
 
