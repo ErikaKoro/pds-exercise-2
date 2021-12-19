@@ -7,7 +7,7 @@ mpi_sort_build:
 	@mkdir -p build
 	$(MPICC) $(CFLAGS) -c ./src/mpi_sort.c -o ./build/mpi_sort.o
 	$(MPICC) $(CFLAGS) -c ./src/quick_select.c -o ./build/quick_select.o
-	$(MPICC) $(CFLAGS) -o ./build/mpi_sort.out ./build/mpi_sort.o ./build/quick_select.o
+	$(MPICC) $(CFLAGS) -o ./build/mpi_sort.out ./build/mpi_sort.o ./build/quick_select.o 
 
 build_quick_select:
 	@mkdir -p build
@@ -23,6 +23,7 @@ mpi_sort_run:
 
 run_quick_select: build_quick_select
 	./build/quick_select.out
+
 
 clean:
 	rm -rf ./build/*.out
