@@ -4,6 +4,7 @@
 #include "quick_select.h"
 
 
+
 /**
  * This function finds the exchanges between the processes according to the following algorithm:
  * counterReceiver::the array in which the master has gathered the number of points each process wants to exchange
@@ -25,106 +26,149 @@
  * @param worldSize
  * @return the array with the infos
  */
-int **findExchanges(int *counterReceiver, int worldSize){
+int *findExchanges(int rank, int *counterReceiver, int worldSize, int master, MPI_Comm communicator, int *numberOfExchanges){
+    int *helperIndex;
+    int **info;
 
-    // Allocate memory for the array that will contain with which process should the current process communicate and how many points will they exchange
-    int **info = (int **)malloc(worldSize * sizeof(int *));
-    for(int i = 0; i < worldSize; i++){
-        info[i] = (int *)malloc(2 * worldSize * sizeof (int));
-    }
+    if(rank == master) {
+        // Allocate memory for the array that will contain with which process should the current process communicate and how many points will they exchange
+        info = (int **) malloc(worldSize * sizeof(int *));
+        for (int i = 0; i < worldSize; i++) {
+            info[i] = (int *) malloc(2 * worldSize * sizeof(int));
+        }
 
-    // This array holds the index for its line in the info array in which we should write the next element
-    int *helperIndex = (int *) calloc(worldSize, sizeof (int));
+        // This array holds the index for its line in the info array in which we should write the next element
+        helperIndex = (int *) calloc(worldSize, sizeof(int));
 
-    int nextIndex = worldSize / 2;  // Indicates the index of the second half of the array
-    for(int i = 0; i < worldSize/2; i++){
+        int nextIndex = worldSize / 2;  // Indicates the index of the second half of the array
+        for (int i = 0; i < worldSize / 2; i++) {
 
-        while(counterReceiver[i] > 0){  // Repeat until each process gets the info for its exchanges. When counterReceiver[i] = 0 the rank doesn't want to exchange anymore or not at all
+            while (counterReceiver[i] > 0) {  // Repeat until each process gets the info for its exchanges. When counterReceiver[i] = 0 the rank doesn't want to exchange anymore or not at all
 
-            if(counterReceiver[i] == counterReceiver[nextIndex]){  // Compare elements of the first half of array to the second half's elements
+                if (counterReceiver[i] == counterReceiver[nextIndex]) {  // Compare elements of the first half of array to the second half's elements
 
-                info[i][helperIndex[i]] = nextIndex;  // Store for the rank i that it should give points to the nextIndex(it lies in the second half of the array as it is initialized with the value worldSize/2
+                    info[i][helperIndex[i]] = nextIndex;  // Store for the rank i that it should give points to the nextIndex(it lies in the second half of the array as it is initialized with the value worldSize/2
 
-                helperIndex[i]++;  // Increase the index which indicates the last index we wrote sth about the i rank
+                    helperIndex[i]++;  // Increase the index which indicates the last index we wrote sth about the i rank
 
-                info[i][helperIndex[i]] = counterReceiver[i];  // In the new index store how many points will the i rank send to the newIndex rank
+                    info[i][helperIndex[i]] = counterReceiver[i];  // In the new index store how many points will the i rank send to the newIndex rank
 
-                helperIndex[i]++;
+                    helperIndex[i]++;
 
-                info[nextIndex][helperIndex[nextIndex]] = i;  // Store the info exchanges for the nextIndex rank as well
-                                                              // Send to the rank i
+                    info[nextIndex][helperIndex[nextIndex]] = i;  // Store the info exchanges for the nextIndex rank as well
+                                                                 // Send to the rank i
 
-                helperIndex[nextIndex]++;  // Increase the index which indicates the last index we wrote sth about the nextIndex rank
+                    helperIndex[nextIndex]++;  // Increase the index which indicates the last index we wrote sth about the nextIndex rank
 
-                info[nextIndex][helperIndex[nextIndex]] = counterReceiver[i];  // Send to rank i as many elements as it sent to rank nextIndex
+                    info[nextIndex][helperIndex[nextIndex]] = counterReceiver[i];  // Send to rank i as many elements as it sent to rank nextIndex
 
-                helperIndex[nextIndex]++;
+                    helperIndex[nextIndex]++;
 
-                counterReceiver[i] = 0; // The i rank has gotten the info for its exchanges
+                    counterReceiver[i] = 0; // The i rank has gotten the info for its exchanges
 
-                counterReceiver[nextIndex] = 0;  // The nextIndex has gotten the info for its exchanges too
+                    counterReceiver[nextIndex] = 0;  // The nextIndex has gotten the info for its exchanges too
 
-                nextIndex++;  // Point to the new index we' re going to write
-            }
-            else if(counterReceiver[i] < counterReceiver[nextIndex]){  // If the current rank wants to give less elements than the nextIndex requires
-                info[i][helperIndex[i]] = nextIndex;
+                    nextIndex++;  // Point to the new index we' re going to write
+                } else if (counterReceiver[i] < counterReceiver[nextIndex]) {  // If the current rank wants to give less elements than the nextIndex requires
+                    info[i][helperIndex[i]] = nextIndex;
 
-                helperIndex[i]++;
+                    helperIndex[i]++;
 
-                info[i][helperIndex[i]] = counterReceiver[i];
+                    info[i][helperIndex[i]] = counterReceiver[i];
 
-                helperIndex[i]++;
+                    helperIndex[i]++;
 
-                info[nextIndex][helperIndex[nextIndex]] = i;
+                    info[nextIndex][helperIndex[nextIndex]] = i;
 
-                helperIndex[nextIndex]++;
+                    helperIndex[nextIndex]++;
 
-                info[nextIndex][helperIndex[nextIndex]] = counterReceiver[i];
+                    info[nextIndex][helperIndex[nextIndex]] = counterReceiver[i];
 
-                helperIndex[nextIndex]++;
+                    helperIndex[nextIndex]++;
 
-                counterReceiver[nextIndex] -= counterReceiver[i]; // the points remained that the nextIndex rank should exchange to finish its exchanges
+                    counterReceiver[nextIndex] -= counterReceiver[i]; // the points remained that the nextIndex rank should exchange to finish its exchanges
 
-                counterReceiver[i] = 0; // The i rank has gotten all the info
-            }
-            else if(counterReceiver[i] > counterReceiver[nextIndex] && counterReceiver[nextIndex] != 0){
-                info[i][helperIndex[i]] = nextIndex;
+                    counterReceiver[i] = 0; // The i rank has gotten all the info
+                } else if (counterReceiver[i] > counterReceiver[nextIndex] && counterReceiver[nextIndex] != 0) {
+                    info[i][helperIndex[i]] = nextIndex;
 
-                helperIndex[i]++;
+                    helperIndex[i]++;
 
-                info[i][helperIndex[i]] = counterReceiver[nextIndex];
+                    info[i][helperIndex[i]] = counterReceiver[nextIndex];
 
-                helperIndex[i]++;
+                    helperIndex[i]++;
 
-                info[nextIndex][helperIndex[nextIndex]] = i;
+                    info[nextIndex][helperIndex[nextIndex]] = i;
 
-                helperIndex[nextIndex]++;
+                    helperIndex[nextIndex]++;
 
-                info[nextIndex][helperIndex[nextIndex]] = counterReceiver[nextIndex];
+                    info[nextIndex][helperIndex[nextIndex]] = counterReceiver[nextIndex];
 
-                helperIndex[nextIndex]++;
+                    helperIndex[nextIndex]++;
 
-                counterReceiver[i] -= counterReceiver[nextIndex];  // The points left in i rank for which we should find with which next process should they be exchanged
+                    counterReceiver[i] -= counterReceiver[nextIndex];  // The points left in i rank for which we should find with which next process should they be exchanged
 
-                counterReceiver[nextIndex] = 0;  // The nextIndex has gotten all its info
+                    counterReceiver[nextIndex] = 0;  // The nextIndex has gotten all its info
 
-                nextIndex++;
-            }
-            else{
-                nextIndex++;  // In case we have counterReceiver[i] > counterReceiver[nextIndex] && counterReceiver[nextIndex] == 0
+                    nextIndex++;
+                } else {
+                    nextIndex++;  // In case we have counterReceiver[i] > counterReceiver[nextIndex] && counterReceiver[nextIndex] == 0
+                }
             }
         }
-    }
-    printf("The array with exchanges is: \n");
-    for(int i = 0; i < worldSize; i++){
-        printf("The i is %d ", i);
-        for (int j = 0; j < helperIndex[i]; ++j) {
-            printf("%d ", info[i][j]);
+
+        printf("The array with exchanges is: \n");
+        for (int i = 0; i < worldSize; i++) {
+            printf("The i is %d ", i);
+            for (int j = 0; j < helperIndex[i]; ++j) {
+                printf("%d ", info[i][j]);
+            }
+            printf("\n");
         }
-        printf("\n");
     }
 
-    return info;
+    // Allocate memory for each process for the info it will receive
+    int *infoPerProc;
+
+    if(rank == master) {
+        MPI_Request *requests = (MPI_Request *) malloc((worldSize - 1) * sizeof (MPI_Request));
+        for (int i = 1; i < worldSize; i++) {
+            MPI_Isend(info[i], helperIndex[i], MPI_INT, i, 10, communicator, &requests[i - 1]);
+        }
+
+//        printf("\nThe rank %d has receive buffer: ", rank);
+//        for(int i = 0; i < helperIndex[0]; i++){
+//            printf("%d ", info[0][i]);
+//        }
+//        printf("\n");
+
+        for(int i = 0; i < worldSize - 1; i++){
+            MPI_Wait(&requests[i], MPI_STATUS_IGNORE);
+        }
+        *numberOfExchanges = helperIndex[0];
+        return info[0];
+
+    } else {
+        int elements;
+        MPI_Status status;
+        MPI_Probe(master, 10, communicator, &status);
+
+        MPI_Get_count(&status, MPI_INT, &elements);
+
+
+        infoPerProc = (int *) malloc(elements * sizeof (int));
+
+        MPI_Recv(infoPerProc, elements, MPI_INT, master, 10, communicator, MPI_STATUS_IGNORE);
+
+
+//        printf("\nThe rank %d has receive buffer: ", rank);
+//        for(int i = 1; i < elements + 1; i++){
+//            printf("%d ", infoPerProc[i]);
+//        }
+//        printf("\n");
+        *numberOfExchanges = elements;
+        return infoPerProc;
+    }
 }
 
 /**
@@ -142,7 +186,7 @@ void findDistance(int rank, double *dist, double **points, int dimension, const 
         for (int j = 0; j < dimension; ++j) {
             dist[i] += (points[i][j] - pivot[j]) * (points[i][j] - pivot[j]);
         }
-        printf("Rank: %d    The distance is %.10f\n", rank, dist[i]);
+        //printf("Rank: %d    The distance is %.10f\n", rank, dist[i]);
     }
 }
 
@@ -230,13 +274,13 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
     if (rank == master){
         // The master, having the array with all the distances finds their median using the "quickselect" algorithm
         median = findMedian(receiver, worldSize * pointsPerProc);
-        printf("\n\n\nDistances master\n");
-        for(int j = 0; j < worldSize * pointsPerProc; j++) {
-            printf("%.10f, ", receiver[j]);
-        }
-        printf("\n");
-
-        printf("Median: %f\n", median);
+//        printf("\n\n\nDistances master\n");
+//        for(int j = 0; j < worldSize * pointsPerProc; j++) {
+//            printf("%.10f, ", receiver[j]);
+//        }
+//        printf("\n");
+//
+//        printf("Median: %f\n", median);
     }
 
 
@@ -248,45 +292,53 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
     // Sort the array holdPoints by holding in the first indexes the points that will remain in the process and in the last indexes the ones that will be exchanged
     int counter = partitionByMedian(worldSize, rank, holdPoints, pointsPerProc, dimension, distance, median);
 
-    printf("\n\nNow the rank %d has holdThePoints is: ", rank);
-    for(int i = 0; i < pointsPerProc; i++){
-        for(int j = 0; j < dimension; j++){
-            printf("%.10f ", holdPoints[i][j]);
-        }
-        printf("\n\n");
-    }
+    //printf("\n\nNow the rank %d has holdThePoints is: ", rank);
+//    for(int i = 0; i < pointsPerProc; i++){
+//        for(int j = 0; j < dimension; j++){
+//            printf("%.10f ", holdPoints[i][j]);
+//        }
+//        printf("\n\n");
+//    }
     int pointsToGive = pointsPerProc - counter;  // The number of points each process wants to give
-    printf("Rank: %d    Counter: %d", rank, counter);
-
-
-    printf("\n\nThe process with rank %d wants to give %d points\n", rank, pointsToGive);
+//    printf("Rank: %d    Counter: %d", rank, counter);
+//
+//
+//    printf("\n\nThe process with rank %d wants to give %d points\n", rank, pointsToGive);
 
     int *counterReceiver = (int *)malloc(worldSize * sizeof (int));  // Allocate a buffer in which the master will store the pointsToGive from each process
 
     // Give the number of points each process wants to exchange to the master
     MPI_Gather(&pointsToGive, 1, MPI_INT, counterReceiver, 1, MPI_INT, master, communicator);
 
-    if(rank == master) {
-        printf("\n\nThe counter receiver is: ");
-        for(int i = 0; i < worldSize; i++) {
-            printf(" %d ", counterReceiver[i]);
+//    if(rank == master) {
+//        printf("\n\nThe counter receiver is: ");
+//        for(int i = 0; i < worldSize; i++) {
+//            printf(" %d ", counterReceiver[i]);
+//        }
+//        printf("\n\n\n");
+//    }
+
+    int numberOfExchanges;
+    int *exchangePerProcess;
+
+    if (rank != master){
+        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, MPI_COMM_WORLD, &numberOfExchanges);
+
+        printf("\nThe rank %d has receive buffer: ", rank);
+        for(int i = 0; i < numberOfExchanges; i++){
+            printf("%d ", exchangePerProcess[i]);
         }
-        printf("\n\n\n");
+        printf("\n");
+    } else{
+
+        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, MPI_COMM_WORLD, &numberOfExchanges);
+        printf("\nThe rank %d has receive buffer: ", rank);
+        for(int i = 0; i < numberOfExchanges; i++){
+            printf("%d ", exchangePerProcess[i]);
+        }
+        printf("\n");
     }
 
-    if(rank == master) {
-        int **exchanges = findExchanges(counterReceiver, worldSize);
-//        printf("The array with exchanges is: ");
-//        for(int i = 0; i < worldSize; i++){
-//            for (int j = 0; j < worldSize; ++j) {
-//                printf("%d ", exchanges[i][j]);
-//            }
-//            printf("\n");
-//        }
-    }
-    else{
-        printf("leave me alone\n\n\n");
-    }
 
 }
 
@@ -330,15 +382,15 @@ int main(int argc, char **argv) {
             holdThePoints[i] = x2;
         }
         fclose(fh);
-
-        printf("\n\n\n");
-        printf("Rank: %d\n", rank);
-        for (int i = 0; i < pointsPerProc; ++i) {
-            for (int j = 0; j < dimension; ++j) {
-                printf("%.10f ", holdThePoints[i][j]);
-            }
-            printf("\n\n\n");
-        }
+//
+//        printf("\n\n\n");
+//        printf("Rank: %d\n", rank);
+//        for (int i = 0; i < pointsPerProc; ++i) {
+//            for (int j = 0; j < dimension; ++j) {
+//                printf("%.10f ", holdThePoints[i][j]);
+//            }
+//            printf("\n\n\n");
+//        }
 
         double *pivot = (double *) calloc(dimension, sizeof(double));
 

@@ -1,5 +1,5 @@
 MPICC=mpicc
-CFLAGS=-O3
+CFLAGS=-O3 -g
 
 default: all
 
@@ -19,7 +19,7 @@ build_quick_select:
 all: mpi_sort_build
 
 mpi_sort_run:
-	mpirun -hostfile hosts ./build/mpi_sort.out ./data/test.bin
+	mpirun -hostfile hosts  ./build/mpi_sort.out ./data/data_2.bin
 
 run_quick_select: build_quick_select
 	./build/quick_select.out
