@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include <string.h>
 #include "quick_select.h"
 
 
@@ -331,27 +332,45 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
     int numberOfExchanges;
     int *exchangePerProcess;
 
-    if (rank != master){
-        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, MPI_COMM_WORLD, &numberOfExchanges);
+    if (rank != master) {
+        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, MPI_COMM_WORLD,
+                                           &numberOfExchanges);
 
         printf("\nThe rank %d has receive buffer: ", rank);
-        for(int i = 0; i < numberOfExchanges; i++){
+        for (int i = 0; i < numberOfExchanges; i++) {
             printf("%d ", exchangePerProcess[i]);
         }
         printf("\n");
-    } else{
+    } else {
 
-        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, MPI_COMM_WORLD, &numberOfExchanges);
+        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, MPI_COMM_WORLD,
+                                           &numberOfExchanges);
         printf("\nThe rank %d has receive buffer: ", rank);
-        for(int i = 0; i < numberOfExchanges; i++){
+        for (int i = 0; i < numberOfExchanges; i++) {
             printf("%d ", exchangePerProcess[i]);
         }
         printf("\n");
     }
 
-    
-}
 
+
+    /// ----------------------------------------------------------EXCHANGES------------------------------------------------------
+    // For each process allocate memory for its requests
+    MPI_Request *requests = (MPI_Request *) malloc((numberOfExchanges / 2) * sizeof(MPI_Request));
+
+    double *sendPoints = (double *) malloc(pointsToGive * dimension * sizeof(double));
+    double *recvBuffer = (double *) malloc(pointsToGive * dimension * sizeof(double));
+    for (int i = counter; i < pointsPerProc; i++) {
+        memcpy(sendPoints + (i - counter) * dimension, holdPoints[i], dimension * sizeof(double));
+    }
+    for (int i = 0; i < numberOfExchanges / 2; i++) {
+        MPI_Isend(sendPoints, dimension * exchangePerProcess[2 * i + 1], MPI_DOUBLE, exchangePerProcess[2 * i], 0,
+                  communicator, &requests[i]);  // FIXME the pointer to send points
+
+
+    }
+
+}
 
 int main(int argc, char **argv) {
     int size;
