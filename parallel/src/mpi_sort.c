@@ -6,6 +6,7 @@
 
 
 /**
+ *
  * This function finds the exchanges between the processes according to the following algorithm:
  * counterReceiver::the array in which the master has gathered the number of points each process wants to exchange
  * The main idea is to compare one by one the processes with ranks smaller than worldSize/2 to the processes with ranks bigger than worldSize/2,
@@ -22,9 +23,14 @@
  * 3 points and take from it 3 points as well.
  * Then, both processes have completed their exchanges.This algorithm continues till all processes have exchanged as many elements as they wanted.
  *
+ * @param rank
  * @param counterReceiver The array with the number of points, each process wants to give, that has bees sent to the master
  * @param worldSize
- * @return the array with the infos
+ * @param master
+ * @param communicator the cluster of processes that calls the function
+ * @param numberOfExchanges points to the length of the array with the infos for each rank
+ * @return the array with the infos per process
+ *
  */
 int *findExchanges(int rank, int *counterReceiver, int worldSize, int master, MPI_Comm communicator, int *numberOfExchanges){
     int *helperIndex;
@@ -130,8 +136,12 @@ int *findExchanges(int rank, int *counterReceiver, int worldSize, int master, MP
     // Allocate memory for each process for the info it will receive
     int *infoPerProc;
 
+    // If you are the master rank send the infos for the exchanges to the other processes
     if(rank == master) {
+        // Allocate memory for the request objects
         MPI_Request *requests = (MPI_Request *) malloc((worldSize - 1) * sizeof (MPI_Request));
+
+        // For each rank in the worldSize send a request from the master to the other processes
         for (int i = 1; i < worldSize; i++) {
             MPI_Isend(info[i], helperIndex[i], MPI_INT, i, 10, communicator, &requests[i - 1]);
         }
@@ -143,22 +153,22 @@ int *findExchanges(int rank, int *counterReceiver, int worldSize, int master, MP
 //        printf("\n");
 
         for(int i = 0; i < worldSize - 1; i++){
-            MPI_Wait(&requests[i], MPI_STATUS_IGNORE);
+            MPI_Wait(&requests[i], MPI_STATUS_IGNORE);  // Wait for the requests to finish
         }
-        *numberOfExchanges = helperIndex[0];
+        *numberOfExchanges = helperIndex[0];  // The length of the array for the infos of the rank master
         return info[0];
 
     } else {
-        int elements;
+        int elements;  // The number of elements that have been requested to be sent
         MPI_Status status;
-        MPI_Probe(master, 10, communicator, &status);
+        MPI_Probe(master, 10, communicator, &status);  // Ask MPI to give you the size of the message
 
         MPI_Get_count(&status, MPI_INT, &elements);
 
 
-        infoPerProc = (int *) malloc(elements * sizeof (int));
+        infoPerProc = (int *) malloc(elements * sizeof (int));  // Allocate memory for the receiver buffer of the processes that will get infos from the master
 
-        MPI_Recv(infoPerProc, elements, MPI_INT, master, 10, communicator, MPI_STATUS_IGNORE);
+        MPI_Recv(infoPerProc, elements, MPI_INT, master, 10, communicator, MPI_STATUS_IGNORE);  // Receive the array per process!
 
 
 //        printf("\nThe rank %d has receive buffer: ", rank);
@@ -339,7 +349,7 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
         printf("\n");
     }
 
-
+    
 }
 
 
