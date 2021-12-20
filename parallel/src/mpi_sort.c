@@ -252,6 +252,18 @@ int partitionByMedian(int worldSize, int rank, double **holdThePoints, int point
     return i;  // At the end of this function the i index points to the first element of the second part of the array with the points of the process that will be exchanged.
 }
 
+void testFunction(double **holdPoints, double *pivot, int dimension, int pointsPerProc, int rank){
+    double *distance = (double *)malloc(pointsPerProc * sizeof (double ));
+    findDistance(rank, distance, holdPoints, dimension, pivot, pointsPerProc);
+
+    printf("Rank: %d. The distances now are: ", rank);
+    for(int i = 0; i < pointsPerProc; i++){
+        printf("%.10f ", distance[i]);
+    }
+    printf("\n\n\n");
+
+}
+
 /**
  * Chooses the pivot, broadcasts it to the processes, calculates the distances, gathers them to the master, which finds their median
  *
@@ -335,25 +347,24 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
     int *exchangePerProcess;
 
     if (rank != master) {
-        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, MPI_COMM_WORLD,
+        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, communicator,
                                            &numberOfExchanges);
 
-        printf("\nThe rank %d has receive buffer: ", rank);
-        for (int i = 0; i < numberOfExchanges; i++) {
-            printf("%d ", exchangePerProcess[i]);
-        }
-        printf("\n");
+//        printf("\nThe rank %d has receive buffer: ", rank);
+//        for (int i = 0; i < numberOfExchanges; i++) {
+//            printf("%d ", exchangePerProcess[i]);
+//        }
+//        printf("\n");
     } else {
 
-        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, MPI_COMM_WORLD,
+        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, communicator,
                                            &numberOfExchanges);
-        printf("\nThe rank %d has receive buffer: ", rank);
-        for (int i = 0; i < numberOfExchanges; i++) {
-            printf("%d ", exchangePerProcess[i]);
-        }
-        printf("\n");
+//        printf("\nThe rank %d has receive buffer: ", rank);
+//        for (int i = 0; i < numberOfExchanges; i++) {
+//            printf("%d ", exchangePerProcess[i]);
+//        }
+//        printf("\n");
     }
-
 
 
     /// ----------------------------------------------------------EXCHANGES------------------------------------------------------
@@ -362,15 +373,95 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
 
     double *sendPoints = (double *) malloc(pointsToGive * dimension * sizeof(double));
     double *recvBuffer = (double *) malloc(pointsToGive * dimension * sizeof(double));
+
     for (int i = counter; i < pointsPerProc; i++) {
         memcpy(sendPoints + (i - counter) * dimension, holdPoints[i], dimension * sizeof(double));
     }
-    for (int i = 0; i < numberOfExchanges / 2; i++) {
-        MPI_Isend(sendPoints, dimension * exchangePerProcess[2 * i + 1], MPI_DOUBLE, exchangePerProcess[2 * i], 0,
-                  communicator, &requests[i]);  // FIXME the pointer to send points
 
+    int offset = 0;
+
+    for (int i = 0; i < numberOfExchanges / 2; i++) {
+        MPI_Isend(sendPoints + offset, dimension * exchangePerProcess[2 * i + 1], MPI_DOUBLE, exchangePerProcess[2 * i],
+                  0, communicator, &requests[i]);
+
+        MPI_Irecv(recvBuffer + offset, dimension * exchangePerProcess[2 * i + 1], MPI_DOUBLE, exchangePerProcess[2 * i],
+                  0, communicator, &requests[i]);
+        offset += dimension * exchangePerProcess[2 * i + 1];
 
     }
+
+    for (int j = 0; j < numberOfExchanges / 2; j++) {
+        MPI_Wait(&requests[j], MPI_STATUS_IGNORE);
+    }
+
+//    printf("\n\n\nThe receive buffer for the rank %d with the infos is:\n", rank);
+//    for (int k = 0; k < pointsToGive; k++) {
+//        for (int l = 0; l < dimension; l++) {
+//            printf("%.10f ", recvBuffer[l + k * dimension]);
+//        }
+//        printf("\n");
+//    }
+
+
+
+    for (int k = counter; k < pointsPerProc; k++) {
+        for (int l = 0; l < dimension; l++) {
+            holdPoints[k][l] = recvBuffer[l + (k - counter) * dimension];
+        }
+    }
+
+//    printf("The new holdPOints with rank %d is: ", rank);
+//    for(int k = 0; k < pointsPerProc; k++){
+//        for(int l = 0; l < dimension; l++){
+//            printf("%.10f ", holdPoints[k][l]);
+//        }
+//        printf("\n");
+//    }
+//    printf("\n\n\n");
+
+//    printf("\n\n");
+//    printf("Rank: %d\n", rank);
+//    for (int i = 0; i < pointsPerProc; ++i) {
+//        for (int j = 0; j < dimension; ++j) {
+//            printf("%.10f ", holdPoints[i][j]);
+//        }
+//        printf("\n\n");
+//    }
+//
+//    MPI_Barrier(MPI_COMM_WORLD);
+
+    // Termination condition
+    if(worldSize == 2)
+        return;
+
+    /// --------------------------------------------- Recursive call ---------------------------------------------
+    // TODO divide the communicator
+    MPI_Comm smallDistComm;
+    MPI_Comm bigDistComm;
+
+    if(rank < worldSize/2){
+        MPI_Comm_split(communicator, 1, rank, &smallDistComm);
+
+        MPI_Comm_rank(smallDistComm, &rank);
+        MPI_Comm_size(smallDistComm, &worldSize);
+
+//        printf("New world size %d small comm\n", worldSize);
+//        printf("New world rank %d small comm\n", rank);
+
+        distributeByMedian(pivot, 0, rank, dimension, holdPoints, pointsPerProc, worldSize, smallDistComm);
+    }
+    else{
+        MPI_Comm_split(communicator, 2, rank, &bigDistComm);
+        MPI_Comm_rank(bigDistComm, &rank);
+        MPI_Comm_size(bigDistComm, &worldSize);
+
+//        printf("New world size %d big comm\n", worldSize);
+//        printf("New world rank %d big comm\n", rank);
+
+        distributeByMedian(pivot, 0, rank, dimension, holdPoints, pointsPerProc, worldSize, bigDistComm);
+
+    }
+
 
 }
 
