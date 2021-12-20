@@ -127,7 +127,7 @@ double findMedian(double *arr, int length){
     }
 
     // Print the Median of arr[]
-    printf("The median is: %f\n", result);
+//    printf("The median is: %f\n", result);
 
     return result;
 
