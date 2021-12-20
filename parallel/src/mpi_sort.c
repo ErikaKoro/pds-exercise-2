@@ -124,14 +124,14 @@ int *findExchanges(int rank, int *counterReceiver, int worldSize, int master, MP
             }
         }
 
-        printf("The array with exchanges is: \n");
-        for (int i = 0; i < worldSize; i++) {
-            printf("The i is %d ", i);
-            for (int j = 0; j < helperIndex[i]; ++j) {
-                printf("%d ", info[i][j]);
-            }
-            printf("\n");
-        }
+//        printf("The array with exchanges is: \n");
+//        for (int i = 0; i < worldSize; i++) {
+//            printf("The i is %d ", i);
+//            for (int j = 0; j < helperIndex[i]; ++j) {
+//                printf("%d ", info[i][j]);
+//            }
+//            printf("\n");
+//        }
     }
 
     // Allocate memory for each process for the info it will receive
@@ -264,7 +264,8 @@ int partitionByMedian(int worldSize, int rank, double **holdThePoints, int point
  * @param communicator "holds" the processes with which we work each time we call recursively the function
  */
 void distributeByMedian(double *pivot,int master, int rank, int dimension, double **holdPoints, int pointsPerProc, int worldSize, MPI_Comm communicator) {
-    double *distance = (double *) calloc(pointsPerProc,sizeof(double)); // for each point hold the squares of the subtractions
+    double *distance = (double *) calloc(pointsPerProc,
+                                         sizeof(double)); // for each point hold the squares of the subtractions
 
     // Find the distance of each point of the process from the pivot point chosen by the master
     findDistance(rank, distance, holdPoints, dimension, pivot, pointsPerProc);
@@ -272,17 +273,17 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
 
     //Allocate the master's buffer to hold the distances
     double *receiver = NULL;
-    if (rank == master){
+    if (rank == master) {
         receiver = (double *) malloc(sizeof(double) * worldSize * pointsPerProc);
     }
 
 
     //The master gathers from all the processes their points' distances from the pivot
-    MPI_Gather(distance, (int)pointsPerProc, MPI_DOUBLE, receiver, (int)pointsPerProc, MPI_DOUBLE, master,
+    MPI_Gather(distance, (int) pointsPerProc, MPI_DOUBLE, receiver, (int) pointsPerProc, MPI_DOUBLE, master,
                communicator);
 
     double median;
-    if (rank == master){
+    if (rank == master) {
         // The master, having the array with all the distances finds their median using the "quickselect" algorithm
         median = findMedian(receiver, worldSize * pointsPerProc);
 //        printf("\n\n\nDistances master\n");
@@ -316,7 +317,8 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
 //
 //    printf("\n\nThe process with rank %d wants to give %d points\n", rank, pointsToGive);
 
-    int *counterReceiver = (int *)malloc(worldSize * sizeof (int));  // Allocate a buffer in which the master will store the pointsToGive from each process
+    int *counterReceiver = (int *) malloc(worldSize *
+                                          sizeof(int));  // Allocate a buffer in which the master will store the pointsToGive from each process
 
     // Give the number of points each process wants to exchange to the master
     MPI_Gather(&pointsToGive, 1, MPI_INT, counterReceiver, 1, MPI_INT, master, communicator);
@@ -411,14 +413,14 @@ int main(int argc, char **argv) {
             holdThePoints[i] = x2;
         }
         fclose(fh);
-//
-//        printf("\n\n\n");
+
+//        printf("\n\n");
 //        printf("Rank: %d\n", rank);
 //        for (int i = 0; i < pointsPerProc; ++i) {
 //            for (int j = 0; j < dimension; ++j) {
 //                printf("%.10f ", holdThePoints[i][j]);
 //            }
-//            printf("\n\n\n");
+//            printf("\n\n");
 //        }
 
         double *pivot = (double *) calloc(dimension, sizeof(double));
@@ -431,13 +433,18 @@ int main(int argc, char **argv) {
             }
             //putchar('\n');
         }
+
+//        MPI_Barrier(MPI_COMM_WORLD);
+
         //Broadcast the pivot to the processes
         MPI_Bcast(pivot, (int)dimension, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         distributeByMedian(pivot, 0, rank, (int)dimension, holdThePoints, (int)pointsPerProc, size, MPI_COMM_WORLD);
 
 
-    }
+//        printf("Rank %d made it here!!", rank);
+        testFunction(holdThePoints, pivot, (int)dimension, (int)pointsPerProc, rank);
 
+    }
 
 
     MPI_Finalize();
