@@ -35,6 +35,8 @@
  */
 int *findExchanges(int rank, int *counterReceiver, int worldSize, int master, MPI_Comm communicator, int *numberOfExchanges){
     int *helperIndex;
+
+    /// IN THE EVEN INDEXES WILL BE STORED THE NUMBER OF POINTS THAT WILL YOU SENT IN THE RANK THAT LIES IN THE ODD INDEXES
     int **info;
 
     if(rank == master) {
@@ -202,7 +204,8 @@ void findDistance(int rank, double *dist, double **points, int dimension, const 
 }
 
 /**
- * Sorts the array with the points per process, holding the ones that each process wants to keep in the first indexes of the array and the other part of the array has the points that it wants to give
+ * Sorts the array with the points per process, holding the ones that each process wants to keep in the first indexes of the array
+ * and the other part of the array has the points that it wants to give.
  *
  * @param worldSize
  * @param rank
@@ -252,20 +255,33 @@ int partitionByMedian(int worldSize, int rank, double **holdThePoints, int point
     return i;  // At the end of this function the i index points to the first element of the second part of the array with the points of the process that will be exchanged.
 }
 
+/**
+ * Test the distances after the recursive call of distributeByMedian so as to know whether it works properly
+ * @param holdPoints
+ * @param pivot
+ * @param dimension
+ * @param pointsPerProc
+ * @param rank
+ */
 void testFunction(double **holdPoints, double *pivot, int dimension, int pointsPerProc, int rank){
     double *distance = (double *)malloc(pointsPerProc * sizeof (double ));
     findDistance(rank, distance, holdPoints, dimension, pivot, pointsPerProc);
 
-    printf("Rank: %d. The distances now are: ", rank);
-    for(int i = 0; i < pointsPerProc; i++){
-        printf("%.10f ", distance[i]);
-    }
-    printf("\n\n\n");
+//    printf("Rank: %d. The distances now are: ", rank);
+//    for(int i = 0; i < pointsPerProc; i++){
+//        printf("%.10f ", distance[i]);
+//    }
+//    printf("\n\n\n");
 
 }
 
 /**
- * Chooses the pivot, broadcasts it to the processes, calculates the distances, gathers them to the master, which finds their median
+ * Chooses the pivot, broadcasts it to the processes, calculates the distances, gathers them to the master, which finds their median, then broadcasts it again to the
+ * other processes in order to calculate how many points do they want to exchange and sort their array with their points based on their distances from the median. After that,
+ * the master gathers from each process how many points each one of them wants to exchange. The master based on the array with the counters finds which process should communicate with
+ * with which process in order to the processes with rank < worldSize/2 have distances(from the pivot) < median and the processes with rank >= worldSize/2 have
+ * distances(from the pivot) > median. Continuously, a buffer info is sent to each process with which one should communicate aiming at the completion of the exchanges.
+ * Finally, the processes communicate and exchange their processes.
  *
  * @param master master rank
  * @param rank process id
@@ -276,8 +292,7 @@ void testFunction(double **holdPoints, double *pivot, int dimension, int pointsP
  * @param communicator "holds" the processes with which we work each time we call recursively the function
  */
 void distributeByMedian(double *pivot,int master, int rank, int dimension, double **holdPoints, int pointsPerProc, int worldSize, MPI_Comm communicator) {
-    double *distance = (double *) calloc(pointsPerProc,
-                                         sizeof(double)); // for each point hold the squares of the subtractions
+    double *distance = (double *) calloc(pointsPerProc,sizeof(double)); // for each point hold the squares of the subtractions
 
     // Find the distance of each point of the process from the pivot point chosen by the master
     findDistance(rank, distance, holdPoints, dimension, pivot, pointsPerProc);
@@ -298,13 +313,7 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
     if (rank == master) {
         // The master, having the array with all the distances finds their median using the "quickselect" algorithm
         median = findMedian(receiver, worldSize * pointsPerProc);
-//        printf("\n\n\nDistances master\n");
-//        for(int j = 0; j < worldSize * pointsPerProc; j++) {
-//            printf("%.10f, ", receiver[j]);
-//        }
-//        printf("\n");
-//
-//        printf("Median: %f\n", median);
+
     }
 
 
@@ -315,55 +324,26 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
     // Call the function which calculates how many points in each process will remain
     // Sort the array holdPoints by holding in the first indexes the points that will remain in the process and in the last indexes the ones that will be exchanged
     int counter = partitionByMedian(worldSize, rank, holdPoints, pointsPerProc, dimension, distance, median);
-
-    //printf("\n\nNow the rank %d has holdThePoints is: ", rank);
-//    for(int i = 0; i < pointsPerProc; i++){
-//        for(int j = 0; j < dimension; j++){
-//            printf("%.10f ", holdPoints[i][j]);
-//        }
-//        printf("\n\n");
-//    }
     int pointsToGive = pointsPerProc - counter;  // The number of points each process wants to give
-//    printf("Rank: %d    Counter: %d", rank, counter);
-//
-//
-//    printf("\n\nThe process with rank %d wants to give %d points\n", rank, pointsToGive);
 
-    int *counterReceiver = (int *) malloc(worldSize *
-                                          sizeof(int));  // Allocate a buffer in which the master will store the pointsToGive from each process
+
+    int *counterReceiver = (int *) malloc(worldSize * sizeof(int));  // Allocate a buffer in which the master will store the pointsToGive from each process
 
     // Give the number of points each process wants to exchange to the master
     MPI_Gather(&pointsToGive, 1, MPI_INT, counterReceiver, 1, MPI_INT, master, communicator);
 
-//    if(rank == master) {
-//        printf("\n\nThe counter receiver is: ");
-//        for(int i = 0; i < worldSize; i++) {
-//            printf(" %d ", counterReceiver[i]);
-//        }
-//        printf("\n\n\n");
-//    }
 
-    int numberOfExchanges;
-    int *exchangePerProcess;
+    ///--------------------------------------------NUMBER OF EXCHANGES AND THE INFO ARRAY--------------------------------------------
+    int numberOfExchanges;  // This variable after calling the findExchanges function will contain the number of communications per process
+                            // and the number of how many points will send to each one of them.So diving this variable by two it will give us the rank communications
+    int *exchangePerProcess;  // Holds the array with which ranks will the current process communicate and how many exchanges will it have with each one of them
 
+    // The function has different returns whether it is called by the master process or by the others
+    // That's why we call it with this condition
     if (rank != master) {
-        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, communicator,
-                                           &numberOfExchanges);
-
-//        printf("\nThe rank %d has receive buffer: ", rank);
-//        for (int i = 0; i < numberOfExchanges; i++) {
-//            printf("%d ", exchangePerProcess[i]);
-//        }
-//        printf("\n");
+        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, communicator,&numberOfExchanges);
     } else {
-
-        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, communicator,
-                                           &numberOfExchanges);
-//        printf("\nThe rank %d has receive buffer: ", rank);
-//        for (int i = 0; i < numberOfExchanges; i++) {
-//            printf("%d ", exchangePerProcess[i]);
-//        }
-//        printf("\n");
+        exchangePerProcess = findExchanges(rank, counterReceiver, worldSize, master, communicator,&numberOfExchanges);
     }
 
 
@@ -371,25 +351,32 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
     // For each process allocate memory for its requests
     MPI_Request *requests = (MPI_Request *) malloc((numberOfExchanges / 2) * sizeof(MPI_Request));
 
-    double *sendPoints = (double *) malloc(pointsToGive * dimension * sizeof(double));
-    double *recvBuffer = (double *) malloc(pointsToGive * dimension * sizeof(double));
+    double *sendPoints = (double *) malloc(pointsToGive * dimension * sizeof(double));  // In this array will be copied the part of the holdPoints,
+                                                                                            // after it is sorted with the partitionByMedian,
+                                                                                            //  that contains the points that each process wants to exchange
+    double *recvBuffer = (double *) malloc(pointsToGive * dimension * sizeof(double));  // In this array will be received the info from the sendPoints buffer
 
     for (int i = counter; i < pointsPerProc; i++) {
-        memcpy(sendPoints + (i - counter) * dimension, holdPoints[i], dimension * sizeof(double));
+        memcpy(sendPoints + (i - counter) * dimension, holdPoints[i], dimension * sizeof(double));  // copy the exchange points from holdPoints to the sendPoints
     }
 
-    int offset = 0;
+    int offset = 0;  // use this offset to know until which index has info been sent
 
     for (int i = 0; i < numberOfExchanges / 2; i++) {
         MPI_Isend(sendPoints + offset, dimension * exchangePerProcess[2 * i + 1], MPI_DOUBLE, exchangePerProcess[2 * i],
-                  0, communicator, &requests[i]);
+                  0, communicator, &requests[i]);  // current rank sends a request to the rank that wants to exchange with, which is stored
+                                                                    // in the exchangePerProcess[2 * i]. In the exchangePerProcess[2 * i + 1] is stored the number of points
+                                                                    // it wants to send, each one of them being represented by as many coordinates as it is the space dimension
+
 
         MPI_Irecv(recvBuffer + offset, dimension * exchangePerProcess[2 * i + 1], MPI_DOUBLE, exchangePerProcess[2 * i],
                   0, communicator, &requests[i]);
-        offset += dimension * exchangePerProcess[2 * i + 1];
+        offset += dimension * exchangePerProcess[2 * i + 1];  // move offset as many elements as have been sent plus the new indexes that were sent in this loop
 
     }
 
+
+    // Wait for the process to finish the communications
     for (int j = 0; j < numberOfExchanges / 2; j++) {
         MPI_Wait(&requests[j], MPI_STATUS_IGNORE);
     }
@@ -403,7 +390,7 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
 //    }
 
 
-
+    //Update the new holdPoints array
     for (int k = counter; k < pointsPerProc; k++) {
         for (int l = 0; l < dimension; l++) {
             holdPoints[k][l] = recvBuffer[l + (k - counter) * dimension];
@@ -430,27 +417,32 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
 //
 //    MPI_Barrier(MPI_COMM_WORLD);
 
+
+
+    /// --------------------------------------------- Recursive call ---------------------------------------------
     // Termination condition
     if(worldSize == 2)
         return;
 
-    /// --------------------------------------------- Recursive call ---------------------------------------------
-    // TODO divide the communicator
-    MPI_Comm smallDistComm;
-    MPI_Comm bigDistComm;
+    //else
+    MPI_Comm smallDistComm; // Define the new communicator after splitting the current worldSize in two for the recursive call
+    MPI_Comm bigDistComm;  // The new communicator for the processes with their distances > median
 
     if(rank < worldSize/2){
-        MPI_Comm_split(communicator, 1, rank, &smallDistComm);
+        MPI_Comm_split(communicator, 1, rank, &smallDistComm);  // Split the communicator in two parts for the processes with ranks > worldSize/2
+                                                                                         // that have distances < median
 
-        MPI_Comm_rank(smallDistComm, &rank);
-        MPI_Comm_size(smallDistComm, &worldSize);
+        MPI_Comm_rank(smallDistComm, &rank);  // Get the current rank after the split
+        MPI_Comm_size(smallDistComm, &worldSize);  // Get the current worldSize after the split
 
 //        printf("New world size %d small comm\n", worldSize);
 //        printf("New world rank %d small comm\n", rank);
 
+        // Call recursively for the new rank, size and communicator
         distributeByMedian(pivot, 0, rank, dimension, holdPoints, pointsPerProc, worldSize, smallDistComm);
     }
     else{
+        // recursive call for the ranks >= worldSize/2 that have distances > median
         MPI_Comm_split(communicator, 2, rank, &bigDistComm);
         MPI_Comm_rank(bigDistComm, &rank);
         MPI_Comm_size(bigDistComm, &worldSize);
@@ -468,7 +460,10 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
 int main(int argc, char **argv) {
     int size;
     int rank;
+
+
     MPI_Init(&argc, &argv);
+    double start, end;
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -527,11 +522,18 @@ int main(int argc, char **argv) {
 
 //        MPI_Barrier(MPI_COMM_WORLD);
 
+        if(rank == 0){
+            start = MPI_Wtime();
+        }
         //Broadcast the pivot to the processes
         MPI_Bcast(pivot, (int)dimension, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         distributeByMedian(pivot, 0, rank, (int)dimension, holdThePoints, (int)pointsPerProc, size, MPI_COMM_WORLD);
 
 
+        if(rank == 0){
+            end = MPI_Wtime();
+            printf("The time is: %.4f", end - start);
+        }
 //        printf("Rank %d made it here!!", rank);
         testFunction(holdThePoints, pivot, (int)dimension, (int)pointsPerProc, rank);
 

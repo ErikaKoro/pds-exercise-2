@@ -101,7 +101,7 @@ void MedianUtil(double arr[], int left, int right, int middle, double *a, double
             return MedianUtil(arr, partitionIndex + 1, right, middle, a, b);
         }
     }
-    return;
+
 }
 
 /**

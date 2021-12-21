@@ -19,7 +19,7 @@ build_quick_select:
 all: mpi_sort_build
 
 mpi_sort_run:
-	mpirun -hostfile hosts  ./build/mpi_sort.out ./data/data_2.bin
+	mpirun -hostfile hosts  ./build/mpi_sort.out ./data/bigbigData.bin
 
 run_quick_select: build_quick_select
 	./build/quick_select.out
