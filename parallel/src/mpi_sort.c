@@ -255,6 +255,79 @@ int partitionByMedian(int worldSize, int rank, double **holdThePoints, int point
     return i;  // At the end of this function the i index points to the first element of the second part of the array with the points of the process that will be exchanged.
 }
 
+
+/**
+ * check if the processes with ranks between 0 and worldSize(exclusive) have distances bigger than the biggest distance they received from the previous process(sorted processes)
+ * so as to know if the processes in the end have the right points
+ *
+ * @param points
+ * @param pointsPerProc
+ * @param dimension
+ * @param pivot
+ */
+void testFunction(double **points, int pointsPerProc, int dimension, double *pivot) {
+
+    int rank;
+    int worldSize;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
+
+    double *dist = (double *) malloc(pointsPerProc * sizeof (double));
+
+    findDistance(rank, dist, points, dimension, pivot, pointsPerProc);
+
+    double maxDist = dist[0];
+    double minDist = dist[0];
+    for (int i = 0; i < pointsPerProc; ++i) {
+        if(dist[i] > maxDist){
+            maxDist = dist[i];
+        }
+
+        if(dist[i] < minDist) {
+            minDist = dist[i];
+        }
+    }
+
+    if (rank == 0){
+        MPI_Send(&maxDist, 1, MPI_DOUBLE, rank + 1, 50, MPI_COMM_WORLD);
+    }
+    else if (rank == worldSize - 1){
+        double prevMax;
+
+        MPI_Recv(&prevMax, 1, MPI_DOUBLE, rank - 1, 50, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        if (prevMax < maxDist) {
+            printf("Rank: %d SUCCESS\n", rank - 1);
+            printf("Rank: %d SUCCESS\n", rank);
+        } else {
+            printf("Rank: %d FAILURE\n", rank - 1);
+
+        }
+
+
+    } else {
+        double prevMax;
+        MPI_Request request_1;
+        MPI_Request request_2;
+
+        MPI_Irecv(&prevMax, 1, MPI_DOUBLE, rank - 1, 50, MPI_COMM_WORLD, &request_1);
+        MPI_Isend(&maxDist, 1, MPI_DOUBLE, rank + 1, 50, MPI_COMM_WORLD, &request_2);
+
+        MPI_Wait(&request_1, NULL);
+        MPI_Wait(&request_2, NULL);
+
+        if (prevMax < maxDist) {
+            printf("Rank: %d SUCCESS\n", rank - 1);
+        } else {
+            printf("Rank: %d FAILURE\n", rank - 1);
+
+        }
+    }
+
+}
+
+
 /**
  * Test the distances after the recursive call of distributeByMedian so as to know whether it works properly
  * @param holdPoints
@@ -263,17 +336,17 @@ int partitionByMedian(int worldSize, int rank, double **holdThePoints, int point
  * @param pointsPerProc
  * @param rank
  */
-void testFunction(double **holdPoints, double *pivot, int dimension, int pointsPerProc, int rank){
-    double *distance = (double *)malloc(pointsPerProc * sizeof (double ));
-    findDistance(rank, distance, holdPoints, dimension, pivot, pointsPerProc);
-
-//    printf("Rank: %d. The distances now are: ", rank);
+//void testFunction2(double **holdPoints, double *pivot, int dimension, int pointsPerProc, int rank){
+//    double *distance = (double *)malloc(pointsPerProc * sizeof (double ));
+//    findDistance(rank, distance, holdPoints, dimension, pivot, pointsPerProc);
+//
+//    printf("Rank: %d. The distances now are: \n\n\n\n\n", rank);
 //    for(int i = 0; i < pointsPerProc; i++){
 //        printf("%.10f ", distance[i]);
 //    }
-//    printf("\n\n\n");
-
-}
+//    printf("\n\n\n\n\n\n");
+//
+//}
 
 /**
  * Chooses the pivot, broadcasts it to the processes, calculates the distances, gathers them to the master, which finds their median, then broadcasts it again to the
@@ -297,6 +370,12 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
     // Find the distance of each point of the process from the pivot point chosen by the master
     findDistance(rank, distance, holdPoints, dimension, pivot, pointsPerProc);
 
+//    printf("\n\n\n");
+//    printf("The distances with rank %d", rank);
+//    for(int  i = 0; i < pointsPerProc; i++){
+//        printf("%.10f ", distance[i]);
+//    }
+//    printf("\n\n\n");
 
     //Allocate the master's buffer to hold the distances
     double *receiver = NULL;
@@ -381,14 +460,6 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
         MPI_Wait(&requests[j], MPI_STATUS_IGNORE);
     }
 
-//    printf("\n\n\nThe receive buffer for the rank %d with the infos is:\n", rank);
-//    for (int k = 0; k < pointsToGive; k++) {
-//        for (int l = 0; l < dimension; l++) {
-//            printf("%.10f ", recvBuffer[l + k * dimension]);
-//        }
-//        printf("\n");
-//    }
-
 
     //Update the new holdPoints array
     for (int k = counter; k < pointsPerProc; k++) {
@@ -396,27 +467,6 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
             holdPoints[k][l] = recvBuffer[l + (k - counter) * dimension];
         }
     }
-
-//    printf("The new holdPOints with rank %d is: ", rank);
-//    for(int k = 0; k < pointsPerProc; k++){
-//        for(int l = 0; l < dimension; l++){
-//            printf("%.10f ", holdPoints[k][l]);
-//        }
-//        printf("\n");
-//    }
-//    printf("\n\n\n");
-
-//    printf("\n\n");
-//    printf("Rank: %d\n", rank);
-//    for (int i = 0; i < pointsPerProc; ++i) {
-//        for (int j = 0; j < dimension; ++j) {
-//            printf("%.10f ", holdPoints[i][j]);
-//        }
-//        printf("\n\n");
-//    }
-//
-//    MPI_Barrier(MPI_COMM_WORLD);
-
 
 
     /// --------------------------------------------- Recursive call ---------------------------------------------
@@ -447,14 +497,12 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
         MPI_Comm_rank(bigDistComm, &rank);
         MPI_Comm_size(bigDistComm, &worldSize);
 
-//        printf("New world size %d big comm\n", worldSize);
-//        printf("New world rank %d big comm\n", rank);
+//        printf("New world size %d big comm\n", worldSize);    //DEBUG COMMENT
+//        printf("New world rank %d big comm\n", rank);         // DEBUG COMMENT
 
         distributeByMedian(pivot, 0, rank, dimension, holdPoints, pointsPerProc, worldSize, bigDistComm);
 
     }
-
-
 }
 
 int main(int argc, char **argv) {
@@ -500,14 +548,6 @@ int main(int argc, char **argv) {
         }
         fclose(fh);
 
-//        printf("\n\n");
-//        printf("Rank: %d\n", rank);
-//        for (int i = 0; i < pointsPerProc; ++i) {
-//            for (int j = 0; j < dimension; ++j) {
-//                printf("%.10f ", holdThePoints[i][j]);
-//            }
-//            printf("\n\n");
-//        }
 
         double *pivot = (double *) calloc(dimension, sizeof(double));
 
@@ -530,15 +570,14 @@ int main(int argc, char **argv) {
         distributeByMedian(pivot, 0, rank, (int)dimension, holdThePoints, (int)pointsPerProc, size, MPI_COMM_WORLD);
 
 
+
         if(rank == 0){
             end = MPI_Wtime();
             printf("The time is: %.4f", end - start);
         }
-//        printf("Rank %d made it here!!", rank);
-        testFunction(holdThePoints, pivot, (int)dimension, (int)pointsPerProc, rank);
-
+        
+        testFunction(holdThePoints, (int)pointsPerProc, (int)dimension, pivot);
     }
-
 
     MPI_Finalize();
 
