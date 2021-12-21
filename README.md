@@ -31,7 +31,9 @@
 
 <p align="justify">
   N:Number of points
+
   p:Number of processes
+  
   The objective of this assignment is to re-distribute the points in the processes so as to have in the first p/2 processes, points with distances from the pivot smaller than the median distance and in second half p/2 processes, points with distances bigger than the median distance. We assume that we have even number of processes and points. Each process in the end of the program has as many points as it had after the first distribution, N/p.
 <br/>
 <br/>
