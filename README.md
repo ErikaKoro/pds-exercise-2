@@ -34,7 +34,7 @@
 
   p:Number of processes
   
-  The objective of this assignment is to re-distribute the points in the processes so as to have in the first p/2 processes, points with distances from the pivot smaller than the median distance and in second half p/2 processes, points with distances bigger than the median distance. We assume that we have even number of processes and points. Each process in the end of the program has as many points as it had after the first distribution, N/p.
+  The objective of this assignment is to re-distribute the points in the processes so as to have in the first p/2 processes, points with distances from the pivot, that are smaller than the median distance and in second half p/2 processes, points with distances bigger than the median distance. We assume that we have number of processes and points that are power of 2. Each process in the end of the program has as many points as it had after the first distribution, N/p.
 <br/>
 <br/>
   For this exercise we use MPI.
@@ -46,20 +46,27 @@
 
 To setup this repository on your local machine run the following commands on the terminal:
 
-Or alternatively [*download*] and extract the zip file of the repository
+```console
+git clone https://github.com/ErikaKoro/pds-exercise-2.git
+```
+
+Or alternatively [*download*](https://github.com/ErikaKoro/pds-exercise-2/archive/refs/heads/main.zip) and extract the zip file of the repository
 <br/>
 <br/>
 
 ## Dependencies
 #### 1. Make or Cmake
 
-This project uses make utilities to build and run the excecutables.
+This project uses make utilities to build and run the executables. 
 
-<br/>
+#### 2. OpenMPI
+
 
 ## Compile and run
 
 ### Linux
+Simply run `make mpi_sort_build` and after that `make mpi_sort_run`.
 
+To change the number of processes modify the hosts and give to the slots as many processes as you want, considering that the number should be a power of 2.
 <br/>
 
