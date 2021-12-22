@@ -329,26 +329,6 @@ void testFunction(double **points, int pointsPerProc, int dimension, double *piv
 
 
 /**
- * Test the distances after the recursive call of distributeByMedian so as to know whether it works properly
- * @param holdPoints
- * @param pivot
- * @param dimension
- * @param pointsPerProc
- * @param rank
- */
-//void testFunction2(double **holdPoints, double *pivot, int dimension, int pointsPerProc, int rank){
-//    double *distance = (double *)malloc(pointsPerProc * sizeof (double ));
-//    findDistance(rank, distance, holdPoints, dimension, pivot, pointsPerProc);
-//
-//    printf("Rank: %d. The distances now are: \n\n\n\n\n", rank);
-//    for(int i = 0; i < pointsPerProc; i++){
-//        printf("%.10f ", distance[i]);
-//    }
-//    printf("\n\n\n\n\n\n");
-//
-//}
-
-/**
  * Chooses the pivot, broadcasts it to the processes, calculates the distances, gathers them to the master, which finds their median, then broadcasts it again to the
  * other processes in order to calculate how many points do they want to exchange and sort their array with their points based on their distances from the median. After that,
  * the master gathers from each process how many points each one of them wants to exchange. The master based on the array with the counters finds which process should communicate with
@@ -575,7 +555,7 @@ int main(int argc, char **argv) {
             end = MPI_Wtime();
             printf("The time is: %.4f", end - start);
         }
-        
+
         testFunction(holdThePoints, (int)pointsPerProc, (int)dimension, pivot);
     }
 
