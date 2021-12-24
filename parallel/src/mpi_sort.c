@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <mpi.h>
 #include <string.h>
+#include <stdbool.h>
+#include <math.h>
 #include "quick_select.h"
 
 
@@ -477,13 +479,18 @@ void distributeByMedian(double *pivot,int master, int rank, int dimension, doubl
         MPI_Comm_rank(bigDistComm, &rank);
         MPI_Comm_size(bigDistComm, &worldSize);
 
-//        printf("New world size %d big comm\n", worldSize);    //DEBUG COMMENT
-//        printf("New world rank %d big comm\n", rank);         // DEBUG COMMENT
+//        printf("New world size %d big comm\n", worldSize);
+//        printf("New world rank %d big comm\n", rank);
 
         distributeByMedian(pivot, 0, rank, dimension, holdPoints, pointsPerProc, worldSize, bigDistComm);
 
     }
 }
+
+bool isPowerOfTwo(int64_t number){
+    return (ceil(log2(number)) == floor(log2(number)));
+}
+
 
 int main(int argc, char **argv) {
     int size;
@@ -507,6 +514,22 @@ int main(int argc, char **argv) {
     if (fh != NULL) {
         fread(&dimension, sizeof(int64_t), 1, fh);
         fread(&numberOfPoints, sizeof(int64_t), 1, fh);
+
+        // hold number of points that is a power of 2
+        if(!isPowerOfTwo(numberOfPoints)){
+            int64_t power = 1;
+            while(power < numberOfPoints)
+                power*=2;
+
+            numberOfPoints = power / 2;
+            if(rank == 0)
+                printf("The number of points is: %ld\n", numberOfPoints);
+        }
+        else{
+            if(rank == 0)
+                printf("The number of points is: %ld\n", numberOfPoints);
+        }
+
 
         pointsPerProc = numberOfPoints / size;
 //        printf("Rank: %d, Points per proc: %ld\n", rank, pointsPerProc);
@@ -553,7 +576,7 @@ int main(int argc, char **argv) {
 
         if(rank == 0){
             end = MPI_Wtime();
-            printf("The time is: %.4f", end - start);
+            printf("The time is: %.4f\n", end - start);
         }
 
         testFunction(holdThePoints, (int)pointsPerProc, (int)dimension, pivot);
